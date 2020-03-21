@@ -38,7 +38,7 @@ ncorr = np.size(x1)
 dist_constants = [1]          # which rate constant to create distribution
 non_dist_constants = [0,2]    # rate constants that are not a distribution
 
-dft_ea = [25.0,32.0,24.0]
+dft_ea = [25.0,32.0,32.0]
 nrxn = np.size(dft_ea)
 sizer = 500
 
@@ -89,9 +89,7 @@ def get_prod_rate(namer1):
   print(sizer)
 
   for i in range(sizer-1):
-    #print(np.abs(kmc_data[i,1]-kmc_data[i+1,1]))
     rate_determine[i] = np.abs(kmc_data[i,1]-kmc_data[i+1,1]) / np.abs(kmc_data[i,0]-kmc_data[i+1,0])*1.0e9
-    #print(rate_determine[i])
 
   print(rate_determine)
 
@@ -226,23 +224,31 @@ def main():
       plt.plot(x,pdf_fitted)
       plt.savefig('turnover_dist_'+str(i)+'.png')
 
+
+
+      const_off =  tl.get_rate_const(1.0e13,dft_ea[2],tl.kb_kcal,273.15+50.0)
+      laplace_fnc = lambda t: 1/(std*np.sqrt(2.*np.pi))*np.exp(-1/2*((t-mu)/std)**2)*np.exp(-const_off*t)
+
       tin = 1. ; checks = 0
       while checks == 0:
-        const_off =  tl.get_rate_const(1.0e13,dft_ea[2],tl.kb_kcal,273.15+50.0)
-        tin = tin*10.
-        check_rate = np.exp(-const_off*tin)
+        check_rate = laplace_fnc(tin)
         if check_rate == 0:
           checks = 1
-          print('done',check_rate,tin)
+        tin = tin*1.2
+      print('tin','%.2e' % tin)
 
-      laplace_fnc = lambda t: 1/(std*np.sqrt(2.*np.pi))*np.exp(-1/2*((t-mu)/std)**2)*np.exp(-const_off*t)
-      laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin)
-      print(laplace_tran)
+      laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,1.0e09)
+      print('laplace',laplace_tran)
 
-      t_on = tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
+      xval = np.linspace(0.0,tin,1e04)
+      fig, ax = plt.subplots()
+      pl.scatter_plot(xval,laplace_fnc(xval),['0','1','2','3'])
+      plt.savefig('grrr2.png')
+
+      t_on = 1./ tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
 
       k_turn = laplace_tran / (t_on + 1/const_off*(1-laplace_tran))
-      print(dft_ea[2],k_turn)
+      print('turn',dft_ea[2],k_turn)
       
       
       raise SystemExit(0)
