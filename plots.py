@@ -34,7 +34,7 @@ def scatter_plot(xdata,ydata,title):
     for i in range(0,np.shape(ydata)[1]):
       plt.plot(xdata,ydata[:,i],'-',label=title[3+i])
   else:
-    plt.plot(xdata,ydata,'.',label=title[3])
+    plt.plot(xdata,ydata,'-',label=title[3])
 
   plt.title(title[0])
   plt.xlabel(title[1])

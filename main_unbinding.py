@@ -155,8 +155,31 @@ def get_sim_plots(namer1,names,temps):        # makes plots (1 show plots, 2 sav
   fit_namer = '_'.join([str(v) for v in fit_nam])
   plt.savefig(fit_namer)     
 #=======================================================================================#
+def get_turnover_freq(ea_off,y):
+
+  const_off = tl.get_rate_const(1.0e13,ea_off,tl.kb_kcal,273.15+50.0)
+  const_on = tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
+
+  mu, std = sp.stats.norm.fit(y)
+
+  #laplace_fnc = lambda t: 1/(std*np.sqrt(2.*np.pi))*np.exp(-1/2*((t-mu)/std)**2)*np.exp(-const_off*t)
+  laplace_fnc = lambda t: tl.gaussian(t,mu,std)*np.exp(-const_off*t)
  
- 
+  # find when function equals zero for integration
+  tin = 1. ; checks = 0
+  while checks == 0:
+    check_rate = laplace_fnc(tin)
+    if check_rate == 0:
+      checks = 1
+    tin = tin*1.2
+
+  laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin)
+
+  turnover_freq = laplace_tran /(1/const_on+1/const_off *(1.0 - laplace_tran))
+
+  return turnover_freq
+#=======================================================================================#
+
 #=======================================================================================#
 def main():
 
@@ -196,13 +219,10 @@ def main():
         dist_namer = '_'.join([str(v) for v in dist_nam])
         plt.savefig(dist_namer)
 
-      turnover_dist = ea_corr
+      turnover_dist = np.zeros(np.shape(ea_corr))
       for i in range(nrxn):
         for j in range(nsim):
           turnover_dist[i,j,ii] = 1.0 / tl.get_rate_const(1.0e13,ea_corr[i,j,ii],tl.kb_kcal,273.15+50.0)
-          #print(tl.get_rate_const(1.0e13,ea_corr[i,j,ii],tl.kb_kcal,273.15+50.0))
-      print('turn')
-      print(turnover_dist[0,:,ii])
 
       # plot correlated distributions
       if type_val[1] == 2:
@@ -213,42 +233,38 @@ def main():
               pl.correlation_plot([ea[i,:],ea[j,:]],[ea_corr[i,:,ii],ea_corr[j,:,ii]],title)
               plt.savefig('correlation_'+str(i)+'_'+str(j)+'.png')
 
+
       #for i in range(nrxn):  # fit the turnover data 
-      i = 1
       fig, ax = plt.subplots()
-      y = turnover_dist[i,:,ii]
+      y = ea_corr[1,:,ii] ; print(y) ; print(min(y)) ; print(max(y))
       plt.hist(y, bins=40, density=True)
       mu, std = sp.stats.norm.fit(y)
-      x = np.linspace(min(y),(max(y),100)) 
+      x = np.linspace(min(y),max(y),100) 
       pdf_fitted = sp.stats.norm.pdf(x,mu,std)
-      plt.plot(x,pdf_fitted)
-      plt.savefig('turnover_dist_'+str(i)+'.png')
+      plt.plot((x),pdf_fitted)
+      plt.savefig('turnover_dist_'+str(int(sig))+'.png')
 
-
-
-      const_off =  tl.get_rate_const(1.0e13,dft_ea[2],tl.kb_kcal,273.15+50.0)
-      laplace_fnc = lambda t: 1/(std*np.sqrt(2.*np.pi))*np.exp(-1/2*((t-mu)/std)**2)*np.exp(-const_off*t)
-
-      tin = 1. ; checks = 0
-      while checks == 0:
-        check_rate = laplace_fnc(tin)
-        if check_rate == 0:
-          checks = 1
-        tin = tin*1.2
-      print('tin','%.2e' % tin)
-
-      laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,1.0e09)
-      print('laplace',laplace_tran)
-
-      xval = np.linspace(0.0,tin,1e04)
       fig, ax = plt.subplots()
-      pl.scatter_plot(xval,laplace_fnc(xval),['0','1','2','3'])
-      plt.savefig('grrr2.png')
+      y = np.log10(turnover_dist[1,:,ii]) ; print(y) ; print(min(y)) ; print(max(y))
+      plt.hist((y), bins=40, density=True)
+      mu, std = sp.stats.norm.fit(y)
+      x = np.linspace(min(y),max(y),100) 
+      pdf_fitted = sp.stats.norm.pdf((x),mu,std)
+      plt.plot((x),pdf_fitted)
+      plt.savefig('turnover_dist2_'+str(int(sig))+'.png')
 
-      t_on = 1./ tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
+      ea_un = [40.0,38.0,36.0,34.0,32.0,30.0,28.0,26.0,24.0,22.0,20.0,18.0,16.0,14.0]
+      turnover_x = np.zeros(np.size(ea_un))
+      turnover_rate = np.zeros(np.size(ea_un))
+      for i in range(np.size(ea_un)):
+        turnover_rate[i] = get_turnover_freq(ea_un[i],y)
+        turnover_x[i] = tl.get_rate_const(1.0e13,ea_un[i],tl.kb_kcal,273.15+50.0)
 
-      k_turn = laplace_tran / (t_on + 1/const_off*(1-laplace_tran))
-      print('turn',dft_ea[2],k_turn)
+
+      fig, ax = plt.subplots()
+      title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','']
+      pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate),title)
+      plt.savefig('turnover_'+str(int(sig))+'.png')
       
       
       raise SystemExit(0)
