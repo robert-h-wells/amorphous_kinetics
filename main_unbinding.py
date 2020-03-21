@@ -18,14 +18,14 @@ num_cores = mp.cpu_count() ; print('num cores',num_cores)
 
 type_run = 1     # 1 for normal, 2 for parallel
 
-type_val = [1,0,0,1,0]  # [0]-run sim, [1]-correlation plots, [2]-determine production rates 
+type_val = [1,1,0,0,0]  # [0]-run sim, [1]-correlation plots, [2]-determine production rates 
                         # [3]-final plots (1 to show, 2 to save), [4]-arrhenius plot 
 
 type_dist = 1    # 1 for gaussian, 2 for laplace
 if type_dist == 1: type_name = 'gauss'
 if type_dist == 2: type_name = 'laplace'
 
-nsim = 2000    # number of catalysts
+nsim = 20000    # number of catalysts
 nconc = 2.0   # initial reactant concentration relative to catalyst
 sig = 0.10
 
@@ -38,7 +38,7 @@ ncorr = np.size(x1)
 dist_constants = [1]          # which rate constant to create distribution
 non_dist_constants = [0,2]    # rate constants that are not a distribution
 
-dft_ea = [16.0,32.0,30.0]
+dft_ea = [25.0,32.0,24.0]
 nrxn = np.size(dft_ea)
 sizer = 500
 
@@ -198,6 +198,14 @@ def main():
         dist_namer = '_'.join([str(v) for v in dist_nam])
         plt.savefig(dist_namer)
 
+      turnover_dist = ea_corr
+      for i in range(nrxn):
+        for j in range(nsim):
+          turnover_dist[i,j,ii] = 1.0 / tl.get_rate_const(1.0e13,ea_corr[i,j,ii],tl.kb_kcal,273.15+50.0)
+          #print(tl.get_rate_const(1.0e13,ea_corr[i,j,ii],tl.kb_kcal,273.15+50.0))
+      print('turn')
+      print(turnover_dist[0,:,ii])
+
       # plot correlated distributions
       if type_val[1] == 2:
         for i in range(0,nrxn):
@@ -206,6 +214,38 @@ def main():
               title = [i+1,j+1]
               pl.correlation_plot([ea[i,:],ea[j,:]],[ea_corr[i,:,ii],ea_corr[j,:,ii]],title)
               plt.savefig('correlation_'+str(i)+'_'+str(j)+'.png')
+
+      #for i in range(nrxn):  # fit the turnover data 
+      i = 1
+      fig, ax = plt.subplots()
+      y = turnover_dist[i,:,ii]
+      plt.hist(y, bins=40, density=True)
+      mu, std = sp.stats.norm.fit(y)
+      x = np.linspace(min(y),(max(y),100)) 
+      pdf_fitted = sp.stats.norm.pdf(x,mu,std)
+      plt.plot(x,pdf_fitted)
+      plt.savefig('turnover_dist_'+str(i)+'.png')
+
+      tin = 1. ; checks = 0
+      while checks == 0:
+        const_off =  tl.get_rate_const(1.0e13,dft_ea[2],tl.kb_kcal,273.15+50.0)
+        tin = tin*10.
+        check_rate = np.exp(-const_off*tin)
+        if check_rate == 0:
+          checks = 1
+          print('done',check_rate,tin)
+
+      laplace_fnc = lambda t: 1/(std*np.sqrt(2.*np.pi))*np.exp(-1/2*((t-mu)/std)**2)*np.exp(-const_off*t)
+      laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin)
+      print(laplace_tran)
+
+      t_on = tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
+
+      k_turn = laplace_tran / (t_on + 1/const_off*(1-laplace_tran))
+      print(dft_ea[2],k_turn)
+      
+      
+      raise SystemExit(0)
     #=======================================================================================#
 
     #================================ Run over temperatures ================================#
