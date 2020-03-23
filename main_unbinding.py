@@ -27,7 +27,7 @@ if type_dist == 2: type_name = 'laplace'
 
 nsim = 20000    # number of catalysts
 nconc = 2.0   # initial reactant concentration relative to catalyst
-sig = 0.10
+sig = 1.0
 
 temp_val = [50.0] 
 tend = [3e09]
@@ -163,12 +163,15 @@ def get_turnover_freq(ea_off,y):
   mu, std = sp.stats.norm.fit(y)
   mu_log, std_log =  sp.stats.norm.fit(np.log10(y))
 
-  print('mu',mu,mu_log)
-  print('std',std,std_log)
+  #print('mu',mu,mu_log)
+  #print('std',std,std_log)
 
   #laplace_fnc = lambda t: 1/(std*np.sqrt(2.*np.pi))*np.exp(-1/2*((t-mu)/std)**2)*np.exp(-const_off*t)
   laplace_fnc_log = lambda t: tl.gaussian(t,mu_log,std_log)*np.exp(-const_off*10**t)
   laplace_fnc = lambda t: tl.gaussian(t,mu,std)*np.exp(-const_off*t)
+
+  #laplace_fnc_log = lambda t: np.exp(-const_off*10**t)
+  #laplace_fnc = lambda t: np.exp(-const_off*t)
 
   # find when function equals zero for integration
   tin = 1.0 ; checks = 0
@@ -178,19 +181,19 @@ def get_turnover_freq(ea_off,y):
       checks = 1
     tin = tin*1.2
 
-  x = np.linspace(0,1e09,1e4)
-  fig, ax = plt.subplots()
-  pl.scatter_plot(x,laplace_fnc(x),['0','1','2','3'])
-  plt.savefig('check.png')
+  #x = np.linspace(0,1e04,1e4)
+  #fig, ax = plt.subplots()
+  #pl.scatter_plot(x,laplace_fnc(x),['0','1','2','3'])
+  #plt.savefig('check.png')
 
   laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin)
 
   tin = np.log10(tin)
 
-  x = np.linspace(8,tin,1e4)
-  fig, ax = plt.subplots()
-  pl.scatter_plot(x,laplace_fnc_log(x),['0','1','2','3'])
-  plt.savefig('check2.png')
+  #x = np.linspace(0,4,1e4)
+  #fig, ax = plt.subplots()
+  #pl.scatter_plot(x,laplace_fnc_log(x),['0','1','2','3'])
+  #plt.savefig('check2.png')
 
   laplace_tran_log, _ =sp.integrate.quad(laplace_fnc_log,0.0,tin)
   print('tran',laplace_tran,laplace_tran_log,'%.4e' % (laplace_tran-laplace_tran_log) )
@@ -267,16 +270,22 @@ def main():
       plt.savefig('turnover_dist_'+str(int(sig))+'.png')
 
       fig, ax = plt.subplots()
-      y = (turnover_dist[1,:,ii])
+      y = (turnover_dist[1,:,ii])   # y = np.log10(turnover_dist[1,:,ii])
       plt.hist((y), bins=40, density=True)
       mu, std = sp.stats.norm.fit(y)
+      print('mu, std',mu,std)
       x = np.linspace(min(y),max(y),100) 
       pdf_fitted = sp.stats.norm.pdf((x),mu,std)
-      plt.plot((x),pdf_fitted)
+      #plt.plot((x),pdf_fitted)
+      plt.xscale('log')
       plt.savefig('turnover_dist2_'+str(int(sig))+'.png')
 
-      #ea_un = [40.0,38.0,36.0,34.0,32.0,30.0,28.0,26.0,24.0,22.0,20.0,18.0,16.0,14.0]
-      ea_un = [32.0]
+      fig, ax = plt.subplots()
+      plt.hist(np.log10(y), bins=40, density=True)
+      plt.savefig('turnover_dist3_'+str(int(sig))+'.png')
+
+      ea_un = [40.0,38.0,36.0,34.0,32.0,30.0,28.0,26.0,24.0,22.0,20.0,18.0,16.0,14.0]
+      #ea_un = [26.0]
       turnover_x = np.zeros(np.size(ea_un))
       turnover_rate = np.zeros(np.size(ea_un))
       for i in range(np.size(ea_un)):
