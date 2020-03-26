@@ -168,34 +168,52 @@ def get_turnover_freq(ea_off,y):
   mu_log, std_log = sp.stats.norm.fit(np.log10(y))
 
   # fit histogram to non-gaussian pdf
-  x = np.linspace(0.0,max(y),100)
-  hist = np.histogram(y,bins=80)
+  nbins = 80
+  x = np.linspace(0.0,1e9,nbins)   # np.linspace(0.0,max(y),nbins)
+  hist = np.histogram(y,bins=nbins)
   hist_dist = sp.stats.rv_histogram(hist)
   laplace_smooth = savgol_filter(hist_dist.pdf(x),31,10)
   spl = sp.interpolate.UnivariateSpline(x,laplace_smooth,s=0.)
 
-  fig, ax = plt.subplots()
-  plt.plot(x,spl(x))
-  plt.hist((y), bins=40, density=True)
-  plt.savefig('grrr.png')
+  def spl2(x,spl):
+    spl2 = np.zeros(np.size(spl))
+    for i in range(np.size(x)):
+      if spl[i] < 0:
+        spl2[i] = 0
+      else:
+        spl2[i] = spl[i]
+
+      if x[i] < 2.5e08:
+        spl2[i] = 0.
+
+      if x[i] > 7.50e08:
+        spl2[i] = 0.
+    return spl2
+
+  x = np.linspace(0.0,1e09,nbins)
+  spl3 = sp.interpolate.UnivariateSpline(x,spl2(x,spl(x)),s=0.)  
+  spl3_integral = sp.interpolate.UnivariateSpline.integral(spl3,0.0,1e09)
+  print('integral',spl3_integral)
 
   # Laplace transform functions to integrate
   laplace_fnc_log = lambda t: tl.gaussian(t,mu_log,std_log)*np.exp(-const_off*10**t)
-  laplace_fnc = lambda t:  tl.gaussian(t,mu,std)#*np.exp(-const_off*t)
+  laplace_fnc = lambda t:  tl.gaussian(t,mu,std)*np.exp(-const_off*t) 
 
-  laplace_fnc_spl = lambda t: spl(t)#*np.exp(-const_off*t)
+  #laplace_fnc_spl = lambda t: spl(t)*np.exp(-const_off*t)
+  laplace_fnc_spl = lambda t: spl3(t)/spl3_integral*np.exp(-const_off*t)
 
-  x = np.linspace(0.0,max(y),100)
   fig, ax = plt.subplots()
   plt.plot(x,laplace_fnc(x))
   plt.plot(x,laplace_fnc_spl(x))
-  #plt.hist((y), bins=40, density=True)
+  plt.hist((y), bins=nbins, density=True)
   plt.savefig('check.png')
 
   fig, ax = plt.subplots()
-  #plt.plot(x,laplace_fnc_fit(x))
-  plt.plot(x,laplace_fnc_spl(x))
-  #plt.hist((y), bins=40, density=True)
+  #plt.plot(x,laplace_fnc_spl(x),label='1')
+  #plt.plot(x,spl(x),label='2')
+  plt.plot(x,spl3(x),label='3')
+  #plt.legend()
+  #plt.hist((y), bins=nbins, density=True)
   plt.savefig('check2.png')
 
 
@@ -206,26 +224,40 @@ def get_turnover_freq(ea_off,y):
     if check_rate == 0:
       checks = 1
     tin = tin*1.2
-  #print('tin','%.3e' % tin)
-  if tin > max(y):
-    tin = max(y)
 
-  x = np.linspace(0,tin,1e4)
-  fig, ax = plt.subplots()
-  pl.scatter_plot(x,laplace_fnc(x),['0','1','2','3'])
-  pl.scatter_plot(x,laplace_fnc_spl(x),['0','1','2','3'])
-  plt.savefig('check_'+str(int(ea_off))+'.png')
+  tin = 1.0e09
+
+  print('tin','%.3e' % tin)
+
+  #x = np.linspace(0,tin,1e4)
+  #fig, ax = plt.subplots()
+  #pl.scatter_plot(x,laplace_fnc(x),['0','1','2','3'])
+  #pl.scatter_plot(x,laplace_fnc_spl(x),['0','1','2','3'])
+  #plt.savefig('check_'+str(int(ea_off))+'.png')
 
   laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin)
+  
+  checks = 0
+  while checks == 0:
+    laplace_tran_spl, _ =sp.integrate.quad(laplace_fnc_spl,0.0,tin)
+    print('while',laplace_tran_spl)
+    if laplace_tran_spl <= 1.0:
+      checks = 1
+    
+    spl3_integral = laplace_tran_spl
+    laplace_fnc_spl = lambda t: spl3(t)/spl3_integral*np.exp(-const_off*t)
+    print(laplace_fnc_spl(tin))
 
   tin = np.log10(tin)
 
   laplace_tran_log, _ =sp.integrate.quad(laplace_fnc_log,0.0,tin)
-  print('tran',laplace_tran,laplace_tran_log,'%.4e' % (laplace_tran-laplace_tran_log) )
+  print('tran',laplace_tran,laplace_tran_spl,'%.4e' % (laplace_tran-laplace_tran_spl) )
 
   turnover_freq = laplace_tran /(1/const_on+1/const_off *(1.0 - laplace_tran))
+  turnover_freq_spl = laplace_tran_spl /(1/const_on+1/const_off *(1.0 - laplace_tran_spl))
   turnover_freq_log = laplace_tran_log /(1/const_on+1/const_off *(1.0 - laplace_tran_log))
-  #print('freq','%.2e' % turnover_freq,'%.2e' % turnover_freq_log)
+
+  print('freq','%.2e' % turnover_freq,'%.2e' % turnover_freq_spl)
 
   return turnover_freq
 #=======================================================================================#
@@ -297,7 +329,7 @@ def main():
       y = (turnover_dist[1,:,ii]) 
 
       #ea_un = [40.0,38.0,36.0,34.0,32.0,30.0,28.0,26.0,24.0,22.0,20.0,18.0,16.0,14.0]
-      ea_un = [30.0]
+      ea_un = [45.0]
       turnover_x = np.zeros(np.size(ea_un))
       turnover_rate = np.zeros(np.size(ea_un))
       for i in range(np.size(ea_un)):
