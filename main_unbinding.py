@@ -5,7 +5,7 @@ import os
 import numpy as np
 import scipy as sp
 import matplotlib
-matplotlib.use('Agg') 
+#matplotlib.use('Agg') 
 from matplotlib import pyplot as plt
 from decimal import Decimal
 import multiprocessing as mp
@@ -25,7 +25,7 @@ type_dist = 1    # 1 for gaussian, 2 for laplace
 if type_dist == 1: type_name = 'gauss'
 if type_dist == 2: type_name = 'laplace'
 
-nsim = 20000    # number of catalysts
+nsim = 50000    # number of catalysts
 nconc = 2.0   # initial reactant concentration relative to catalyst
 sig = 0.10
 
@@ -159,6 +159,8 @@ def get_turnover_freq(ea_off,y):
 
   from scipy.signal import savgol_filter
 
+  time_max = 2.0*max(y)
+
   # get rate constants for turnover frequency 
   const_off = tl.get_rate_const(1.0e13,ea_off,tl.kb_kcal,273.15+50.0)
   const_on = tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
@@ -168,9 +170,10 @@ def get_turnover_freq(ea_off,y):
   mu_log, std_log = sp.stats.norm.fit(np.log10(y))
 
   # fit histogram to non-gaussian pdf
-  nbins = 80
-  x = np.linspace(0.0,1e9,nbins)   # np.linspace(0.0,max(y),nbins)
-  hist = np.histogram(y,bins=nbins)
+  nbins = 100
+  nbins2 = 80
+  x = np.linspace(0.0,time_max,nbins2)   # np.linspace(0.0,max(y),nbins)
+  hist = np.histogram(y,bins=nbins2)
   hist_dist = sp.stats.rv_histogram(hist)
   laplace_smooth = savgol_filter(hist_dist.pdf(x),31,10)
   spl = sp.interpolate.UnivariateSpline(x,laplace_smooth,s=0.)
@@ -183,17 +186,16 @@ def get_turnover_freq(ea_off,y):
       else:
         spl2[i] = spl[i]
 
-      if x[i] < 2.5e08:
+      if x[i] < min(y):
         spl2[i] = 0.
 
-      if x[i] > 7.50e08:
+      if x[i] > max(y):
         spl2[i] = 0.
     return spl2
 
-  x = np.linspace(0.0,1e09,nbins)
-  spl3 = sp.interpolate.UnivariateSpline(x,spl2(x,spl(x)),s=0.)  
-  spl3_integral = sp.interpolate.UnivariateSpline.integral(spl3,0.0,1e09)
-  print('integral',spl3_integral)
+  x = np.linspace(0.0,time_max,nbins*10)
+  spl3 = sp.interpolate.UnivariateSpline(x,spl2(x,spl(x)),s=0.0)  
+  spl3_integral = sp.interpolate.UnivariateSpline.integral(spl3,0.0,time_max)
 
   # Laplace transform functions to integrate
   laplace_fnc_log = lambda t: tl.gaussian(t,mu_log,std_log)*np.exp(-const_off*10**t)
@@ -201,33 +203,37 @@ def get_turnover_freq(ea_off,y):
 
   #laplace_fnc_spl = lambda t: spl(t)*np.exp(-const_off*t)
   laplace_fnc_spl = lambda t: spl3(t)/spl3_integral*np.exp(-const_off*t)
+  laplace_fnc_spl2 = lambda t: spl2(t,spl(t))*np.exp(-const_off*t)
+  laplace_fnc_spl3 = lambda t: spl(t)*np.exp(-const_off*t)
+
+  # find when function equals zero for integration
+  tin = 0.10 ; checks = 0 ; max_rate = 0.0
+  while checks == 0:
+    check_rate = laplace_fnc(tin)
+    if laplace_fnc(tin) > max_rate: max_rate = laplace_fnc(tin)
+    if check_rate / max_rate < 0.001 :
+      checks = 1
+    tin = tin*1.2
+
+  tin = 2.0*tin
+
+  #tin = 1.0e09
+  print('tin','%.3e' % tin,'%.3e' % laplace_fnc_spl(tin),laplace_fnc(tin))
+
+  x = np.linspace(0,tin,nbins*10)  # time_max
+  fig, ax = plt.subplots()
+  plt.plot(x,tl.gaussian(x,mu,std),label='1')
+  plt.plot(x,spl3(x)/spl3_integral,'-',label='2')
+  plt.hist((y), bins=nbins, density=True)
+  #plt.xscale('log')
+  plt.savefig('check2.png')
+  plt.close()
 
   fig, ax = plt.subplots()
   plt.plot(x,laplace_fnc(x))
   plt.plot(x,laplace_fnc_spl(x))
-  plt.hist((y), bins=nbins, density=True)
   plt.savefig('check.png')
-
-  fig, ax = plt.subplots()
-  #plt.plot(x,laplace_fnc_spl(x),label='1')
-  #plt.plot(x,spl(x),label='2')
-  plt.plot(x,spl3(x),label='3')
-  #plt.legend()
-  #plt.hist((y), bins=nbins, density=True)
-  plt.savefig('check2.png')
-
-
-  # find when function equals zero for integration
-  tin = 0.10 ; checks = 0
-  while checks == 0:
-    check_rate = laplace_fnc(tin)
-    if check_rate == 0:
-      checks = 1
-    tin = tin*1.2
-
-  tin = 1.0e09
-
-  print('tin','%.3e' % tin)
+  plt.close()
 
   #x = np.linspace(0,tin,1e4)
   #fig, ax = plt.subplots()
@@ -237,20 +243,22 @@ def get_turnover_freq(ea_off,y):
 
   laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin)
   
-  checks = 0
+  checks = 0 ; num = 0
   while checks == 0:
     laplace_tran_spl, _ =sp.integrate.quad(laplace_fnc_spl,0.0,tin)
-    print('while',laplace_tran_spl)
     if laplace_tran_spl <= 1.0:
       checks = 1
+
+    num += 1 
+    if num > 3: checks = 1
     
     spl3_integral = laplace_tran_spl
     laplace_fnc_spl = lambda t: spl3(t)/spl3_integral*np.exp(-const_off*t)
-    print(laplace_fnc_spl(tin))
 
   tin = np.log10(tin)
 
   laplace_tran_log, _ =sp.integrate.quad(laplace_fnc_log,0.0,tin)
+  laplace_tran_spl = np.abs(laplace_tran_spl)
   print('tran',laplace_tran,laplace_tran_spl,'%.4e' % (laplace_tran-laplace_tran_spl) )
 
   turnover_freq = laplace_tran /(1/const_on+1/const_off *(1.0 - laplace_tran))
@@ -259,7 +267,7 @@ def get_turnover_freq(ea_off,y):
 
   print('freq','%.2e' % turnover_freq,'%.2e' % turnover_freq_spl)
 
-  return turnover_freq
+  return turnover_freq,turnover_freq_spl
 #=======================================================================================#
 
 #=======================================================================================#
@@ -328,17 +336,18 @@ def main():
 
       y = (turnover_dist[1,:,ii]) 
 
-      #ea_un = [40.0,38.0,36.0,34.0,32.0,30.0,28.0,26.0,24.0,22.0,20.0,18.0,16.0,14.0]
-      ea_un = [45.0]
+      #ea_un = [40.0,38.0,36.0,34.0,32.0,30.0,28.0,26.0,24.0,22.0,20.0]
+      ea_un = [30.0]
       turnover_x = np.zeros(np.size(ea_un))
-      turnover_rate = np.zeros(np.size(ea_un))
+      turnover_rate = np.zeros((np.size(ea_un),2))
       for i in range(np.size(ea_un)):
         turnover_rate[i] = get_turnover_freq(ea_un[i],y)
         turnover_x[i] = tl.get_rate_const(1.0e13,ea_un[i],tl.kb_kcal,273.15+50.0)
 
       fig, ax = plt.subplots()
       title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','']
-      pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate),title)
+      pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,0]),title)
+      pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,1]),title)
       plt.savefig('turnover_'+str(int(sig))+'.png')
       
       
