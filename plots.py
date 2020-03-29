@@ -51,6 +51,12 @@ def exp_2(t,A,B,k1,k2,C):
 def exp_3(t,A,B,C,k1,k2,k3,D):
   return A*np.exp(-k1*t)+B*np.exp(-k2*t)+C*np.exp(-k3*t)+D
 
+def log_normal(t,A,B):
+  return 1./(np.sqrt(2.0*np.pi)*A*t)*np.exp(-(np.log(t)-B)**2/(2.0*A**2))
+
+def weibull(t,A,B):
+  return A*B*(B*t)**(A-1.0)*np.exp(-(B*t)**A)
+
 #=============================================================================================================#
 def scatter_fit_plot(func,xdata,ydata,init,title,val):
   
