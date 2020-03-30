@@ -27,7 +27,7 @@ if type_dist == 2: type_name = 'laplace'
 
 nsim = 50000    # number of catalysts
 nconc = 2.0   # initial reactant concentration relative to catalyst
-sig = 0.50
+sig = 0.10
 
 temp_val = [50.0] 
 tend = [3e09]
@@ -172,13 +172,29 @@ def get_turnover_freq(ea_off,y):
   mu_log, std_log = sp.stats.norm.fit(np.log10(y))
 
   # fit histogram to non-gaussian pdf
-  nbins = 800
-  nbins2 = 800
+  nbins = 100
+  nbins2 = 100
   x = np.linspace(0.0,time_max,nbins2)   # np.linspace(0.0,max(y),nbins)
   hist = np.histogram(y,bins=nbins2)
   hist_dist = sp.stats.rv_histogram(hist)
   laplace_smooth = savgol_filter(hist_dist.pdf(x),31,10)
   spl = sp.interpolate.UnivariateSpline(x,laplace_smooth,s=0.)
+
+  # Attempt other fit functions
+  init = [1e09,np.log(0.5e09)]
+  popt, pcov = sp.optimize.curve_fit(pl.log_normal,x,hist_dist.pdf(x),p0=init)
+  modelPredictions = pl.log_normal(x, 1.0, np.log(0.5e09))  # *popt
+  print(*popt)
+  fig, ax = plt.subplots()
+  plt.hist((y), bins=nbins2, density=True)
+  plt.plot(x,modelPredictions,label='log normal')
+
+  popt, pcov = sp.optimize.curve_fit(pl.weibull,x,hist_dist.pdf(x),p0=init)
+  print(*popt)
+  modelPredictions = pl.weibull(x, 1e09,1e09)
+  #plt.plot(x,modelPredictions,label='weibull')
+  plt.legend()
+  plt.show()
 
   def spl2(x,spl):
     spl2 = np.zeros(np.size(spl))
@@ -321,8 +337,8 @@ def main():
 
       y = (turnover_dist[1,:,ii]) 
 
-      ea_un = [40.0,38.0,36.0,34.0,33.0,32.0,31.0,30.0,28.0]
-      #ea_un = [40.0]
+      #ea_un = [40.0,38.0,36.0,34.0,33.0,32.0,31.0,30.0,29.0,28.0]
+      ea_un = [40.0]
       turnover_x = np.zeros(np.size(ea_un))
       turnover_rate = np.zeros((np.size(ea_un),2))
 
