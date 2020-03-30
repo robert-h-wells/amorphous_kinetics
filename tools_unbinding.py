@@ -307,3 +307,18 @@ def kmc_unbinding(catalysts,species_conc,fil,sizer):
   print('tin',' %.2E' % Decimal(tin))
   return(tin-delta_t)
 #=============================================================================================================#
+def spl2(x,y,spl):    # used for the full fit spline (not completely sure I stil need it)
+  spl2 = np.zeros(np.size(spl))
+  for i in range(np.size(x)):
+    if spl[i] < 0:
+      spl2[i] = 0
+    else:
+      spl2[i] = spl[i]
+
+    if x[i] < min(y):
+      spl2[i] = 0.
+
+    if x[i] > max(y):
+      spl2[i] = 0.
+  return spl2
+#=============================================================================================================#
