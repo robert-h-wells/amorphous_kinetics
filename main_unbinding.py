@@ -27,7 +27,7 @@ if type_dist == 2: type_name = 'laplace'
 
 nsim = 50000    # number of catalysts
 nconc = 1.0   # initial reactant concentration relative to catalyst
-sig = 1.50
+sig = 0.50
 
 temp_val = [50.0] 
 tend = [3e09]
@@ -160,14 +160,16 @@ def get_turnover_freq(ea_off,y):
   from scipy.signal import savgol_filter
 
   time_max = 2.0*max(y)
-  time_max = 1.0e11
+  #time_max = 1.0e13
 
   # get rate constants for turnover frequency 
   const_off = tl.get_rate_const(1.0e13,ea_off,tl.kb_kcal,273.15+50.0)
   const_on = tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
 
-  nbins = 10000  #1000
-  nbins2 = 10000  #500
+  print('log off',np.log10(const_off))
+
+  nbins = 1000  #1000
+  nbins2 = 1000  #500
   x = np.linspace(0.0,time_max,nbins2)
 
   #=============================================================================#
@@ -181,8 +183,6 @@ def get_turnover_freq(ea_off,y):
   #spl3_integral = sp.interpolate.UnivariateSpline.integral(spl3,0.0,time_max)
 
   #x = np.linspace(0.0,time_max,nbins2)
-
-  log_bins = np.logspace(1.0,np.log10(time_max),nbins2)
 
   # Log Normal fit
   init = [1.5*sig,np.log(4.4e08)]
@@ -210,7 +210,9 @@ def get_turnover_freq(ea_off,y):
   plt.plot(x,pl.log_normal(x,*log_normal_param),label='Log Normal')
   y_hist = y[(y < time_max)]
   plt.hist((y_hist), bins=nbins2, density=True)
-  plt.legend()
+  plt.xlabel('Time (s)')
+  plt.title('$f_{cat}(t)$ Log Normal Distribution')
+  #plt.legend()
   #plt.xscale('log')
   plt.savefig('pdf_check.png')
   #plt.show()
@@ -225,7 +227,28 @@ def get_turnover_freq(ea_off,y):
   #plt.show()
   plt.close()
 
-  laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,np.inf) # tin
+  toff = 5.0e14  # 2.0e12
+  if ea_off < 36.0:
+    toff = 1.0e13
+  if ea_off < 33.0:
+    toff = 1.0e12  # 1.0e08
+  if ea_off < 32.0:
+    toff = 1.0e11
+  if ea_off < 30.0:
+    toff = 1.0e10
+  if ea_off < 28.0:
+    toff = 1.0e08
+  if ea_off < 25.0:
+    toff = 1.0e05
+  if ea_off < 23.0:
+    toff = 2.0e03
+
+
+  if ea_off < 25:
+    toff = np.inf
+
+  #laplace_tran, _ =sp.integrate.quad(laplace_fnc,1.0e09,np.inf,epsabs=1e-18,limit=5000) # tin
+  laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,toff,epsabs=1e-18,limit=5000) # tin
   laplace_tran_spl, _ =sp.integrate.quad(laplace_fnc_spl,0.0,tin,limit=500)
   
   print('tran',laplace_tran,laplace_tran_spl,'%.4e' % (laplace_tran-laplace_tran_spl) )
@@ -306,8 +329,8 @@ def main():
 
       y = (turnover_dist[1,:,ii]) 
 
-      ea_un = [40.0,38.0,36.0,34.0,33.0,32.0,31.0,30.0,28.0]
-      ea_un = [28.0]
+      #ea_un = [40.0,38.0,36.0,34.0,33.0,32.0,31.0,30.0,28.0,26.0,25.0,24.0,23.0,22.0,20.0,18.0,17.0]
+      ea_un = [32.0]
       turnover_x = np.zeros(np.size(ea_un))
       turnover_rate = np.zeros((np.size(ea_un),2))
 
@@ -324,25 +347,28 @@ def main():
 
       fig, ax = plt.subplots()
       title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Fit']
-      pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,1]),title)
-      title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Log Normal']
       pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,0]),title)
+      title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Log Normal']
+      #pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,0]),title)
       #plt.legend()
       plt.savefig('turnover_0'+str(int(10*sig))+'.png')
 
 
       # make figure of all the plots 
-      if 1==0:
-        sig_val = ['01','03','05','08']
+      if 1==1:
+        sig_val = ['01','08','010','013','015', '018', '020']
         turn_rate = []
         fig, ax = plt.subplots()
         for i in sig_val:
           fil = open('turnover_rate_'+str(i)+'.txt',"r")
           dat = np.genfromtxt(fil)
-          plt.plot(np.log10(dat[:,0]),np.log10(dat[:,1]),label=str(i))
+          plt.plot(np.log10(dat[:,0]),np.log10(dat[:,1]),label=str(int(i)*10/100))
         plt.legend()
-        plt.savefig('total_rates.png')
-        #plt.show()
+        plt.title('Turnover Rate  vs Unbinding Rate')
+        plt.xlabel('k$_{off}$ (log10 $s^{-1}$)')
+        plt.ylabel('k$_{turnover}$ (log10 $s^{-1}$)')
+        #plt.savefig('total_rates.png')
+        plt.show()
       
       
       raise SystemExit(0)

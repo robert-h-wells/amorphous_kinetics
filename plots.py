@@ -102,9 +102,9 @@ def scatter_plot_3d(data,data2,data3,title):
 def distribution_plot(data):
   fig, ax = plt.subplots() 
 
-  plt.subplot(3,1,1) ; plt.hist(data[0,:], bins=60, density=True, color='r', label='k_ad') ; plt.legend()
+  plt.subplot(3,1,1) ; plt.hist(data[0,:], bins=60, density=True, color='r', label='k_on') ; plt.legend()
   plt.subplot(3,1,2) ; plt.hist(data[1,:], bins=60, density=True, color='b', label='k_cat') ; plt.legend()
-  plt.subplot(3,1,3) ; plt.hist(data[2,:], bins=60, density=True, color='g', label='k_rev') ; plt.legend() 
+  plt.subplot(3,1,3) ; plt.hist(data[2,:], bins=60, density=True, color='g', label='k_off') ; plt.legend() 
   plt.xlabel('Ea (kcal/mol)')
   plt.suptitle('Energetic Barrier Distributions')
 #=============================================================================================================#
