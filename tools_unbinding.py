@@ -229,6 +229,9 @@ def kmc_run(catalysts,species_conc,fil,sizer):
   sizer_check = 0
   num_product = 0. 
 
+  # checking desorb process
+  ndesorb = 0
+
   # Initialize catalysts and find beginning total rate
   for i in range(0,ncatalyst):
     catalysts[i].species_cov(0)
@@ -248,6 +251,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
     # Choose time at which next action occurs
     randy = np.random.random()
     delta_t = -1.0/(total_rate+ads_rate)*np.log(randy)
+    print(delta_t)
     tin += delta_t 
     rand_val = randy*(total_rate+ads_rate)
     
@@ -291,6 +295,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
 
     if val == 2:  # reactant desorbed from catalyst
       #print('desorb',tin)
+      ndesorb += 1
       catalyst_free += 1 
       catalyst_free_list.append(check_val)
       catalysts[check_val].species_cov(0)
@@ -314,7 +319,8 @@ def kmc_run(catalysts,species_conc,fil,sizer):
     dat = np.hstack([i,catalysts[i].ea_corr,catalysts[i].production])
     np.savetxt(fil[1],dat, newline=" ") ; fil[1].write('\n')
 
-  #print('tin',' %.2E' % Decimal(tin))
+  print('ndesorb',ndesorb)
+  print('tin',' %.2E' % Decimal(tin))
   return(tin-delta_t)
 #=============================================================================================================#
 def get_pdf(namer,sig):   
@@ -334,7 +340,7 @@ def get_pdf(namer,sig):
 
   fig, ax = plt.subplots()
   plt.plot(x,pl.log_normal(x,*fit_param))
-  plt.hist(turn_dat,bins=100,density=True)
+  plt.hist(turn_dat,bins=500,density=True)
   plt.show()
 
   moment_fnc = lambda t: t*pl.log_normal(t,*fit_param)
