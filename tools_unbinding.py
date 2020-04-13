@@ -6,6 +6,10 @@ import numpy as np
 import scipy as sp
 from scipy.stats import norm
 from decimal import Decimal
+import matplotlib
+from matplotlib import pyplot as plt
+
+import plots as pl
 
 # important constants
 gas_const= 8.3144598        # [J/mol*K]
@@ -198,7 +202,7 @@ class catalyst:
       return(0)
     elif self.cov == 1:
       if val + self.rate_const[1] > rand_val:
-        action_choice = 1  # ES -> E
+        action_choice = 1  # ES -> E + P
         self.cov = 0  ; self.species_cov(self.cov)
         self.production[0] += 1
         return(1)
@@ -210,7 +214,7 @@ class catalyst:
 #=============================================================================================================#
 
 #=============================================================================================================#
-def kmc_unbinding(catalysts,species_conc,fil,sizer):
+def kmc_run(catalysts,species_conc,fil,sizer):
   # Run kinetic Monte Carlo simulations of an amorphous catalyst system. Michaelis-Menten kinetics.
   #
   # Input catalyst (# of sites and energies). Gas species initial concentration relative to catalyst.
@@ -237,7 +241,7 @@ def kmc_unbinding(catalysts,species_conc,fil,sizer):
   ads_rate = ads_rate_const*catalyst_free*num_species/ncatalyst  # find adsorption rate (k*N_free*[A])
  
   #========== start the simulation ==========#
-  while (num_product < num_species_init*0.99):  #0.97
+  while (num_product < num_species_init):  #0.97
 
     ads_rate = ads_rate_const*catalyst_free*num_species/ncatalyst  # find adsorption rate (k*N_free*[A])
 
@@ -280,7 +284,13 @@ def kmc_unbinding(catalysts,species_conc,fil,sizer):
       num_product += 1
       conc[0] -= 1
       conc[1] += 1
+
+      #if 1 == 1:  # print to file the time of product formation
+      dat = np.hstack([tin])
+      np.savetxt(fil[2],dat, newline=" ") ; fil[2].write('\n')
+
     if val == 2:  # reactant desorbed from catalyst
+      #print('desorb',tin)
       catalyst_free += 1 
       catalyst_free_list.append(check_val)
       catalysts[check_val].species_cov(0)
@@ -304,8 +314,35 @@ def kmc_unbinding(catalysts,species_conc,fil,sizer):
     dat = np.hstack([i,catalysts[i].ea_corr,catalysts[i].production])
     np.savetxt(fil[1],dat, newline=" ") ; fil[1].write('\n')
 
-  print('tin',' %.2E' % Decimal(tin))
+  #print('tin',' %.2E' % Decimal(tin))
   return(tin-delta_t)
+#=============================================================================================================#
+def get_pdf(namer,sig):   
+  # create probability density function of the turnover times from kmc run
+
+  turn_dat = np.genfromtxt(namer, delimiter = '\n')
+  time_max = 2.0*max(turn_dat)
+
+  nbins = 1000
+  x = np.linspace(0.10,time_max,nbins)
+  hist = np.histogram(turn_dat,bins=nbins)
+  hist_dist = sp.stats.rv_histogram(hist)
+
+  init = [1.5*sig,np.log(4.4e08)] 
+  popt, pcov = sp.optimize.curve_fit(pl.log_normal,x,hist_dist.pdf(x),p0=init)
+  fit_param = popt
+
+  fig, ax = plt.subplots()
+  plt.plot(x,pl.log_normal(x,*fit_param))
+  plt.hist(turn_dat,bins=100,density=True)
+  plt.show()
+
+  moment_fnc = lambda t: t*pl.log_normal(t,*fit_param)
+  moment_int, _ =sp.integrate.quad(moment_fnc,0.0,1.0e10,limit=500)
+  print('val','%.3e' % (1.0 / moment_int))
+#=============================================================================================================#
+
+
 #=============================================================================================================#
 def spl2(x,y,spl):    # used for the full fit spline (not completely sure I stil need it)
   spl2 = np.zeros(np.size(spl))

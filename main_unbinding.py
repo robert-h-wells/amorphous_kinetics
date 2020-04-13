@@ -18,16 +18,16 @@ num_cores = mp.cpu_count() ; print('num cores',num_cores)
 
 type_run = 1     # 1 for normal, 2 for parallel
 
-type_val = [1,1,0,0,0]  # [0]-run sim, [1]-correlation plots, [2]-determine production rates 
+type_val = [2,1,0,0,0]  # [0]-run sim, [1]-correlation plots, [2]-determine production rates 
                         # [3]-final plots (1 to show, 2 to save), [4]-arrhenius plot 
 
 type_dist = 1    # 1 for gaussian, 2 for laplace
 if type_dist == 1: type_name = 'gauss'
 if type_dist == 2: type_name = 'laplace'
 
-nsim = 50000    # number of catalysts
+nsim = 10000    # number of catalysts
 nconc = 1.0   # initial reactant concentration relative to catalyst
-sig = 0.50
+sig = 0.10
 
 temp_val = [50.0] 
 tend = [3e09]
@@ -38,7 +38,7 @@ ncorr = np.size(x1)
 dist_constants = [1]          # which rate constant to create distribution
 non_dist_constants = [0,2]    # rate constants that are not a distribution
 
-dft_ea = [16.0,32.0,32.0]
+dft_ea = [16.0,32.0,30.0]
 nrxn = np.size(dft_ea)
 sizer = 500
 
@@ -61,9 +61,11 @@ def temp_run(temps,tend,iii):
 
       nam1 = [type_name, 'kmc', *names,'.txt']
       nam2 = [type_name, 'catalyst', *names,'.txt']
+      nam3 = [type_name, 'prod_time', *names,'.txt']
 
       namer1 = '_'.join([str(v) for v in nam1])
       namer2 = '_'.join([str(v) for v in nam2])
+      namer3 = '_'.join([str(v) for v in nam3])
 
       # initialize information for the catalysts
       catalysts = []
@@ -75,8 +77,12 @@ def temp_run(temps,tend,iii):
       # kmc run
       f = open(namer1,"w") ;  f = open(namer1,"a")
       g = open(namer2,"w") ;  g = open(namer2,"a") 
-      tend = tl.kmc_unbinding(catalysts,nconc,[f,g],sizer)
-      f.close() ; g.close()
+      h = open(namer3,"w") ;  h = open(namer3,"a") 
+      tend = tl.kmc_run(catalysts,nconc,[f,g,h],sizer)
+      f.close() ; g.close() ; h.close()
+
+      # get pdf of production times
+      tl.get_pdf(namer3,sig)
 #=======================================================================================#
 
 #=======================================================================================#
@@ -108,18 +114,6 @@ def get_sim_plots(namer1,names,temps):        # makes plots (1 show plots, 2 sav
 
   kmc_data = np.genfromtxt(namer1, delimiter = ' ')
   ma_x, ma_y = tl.mm_integrator(kmc_data[-1,0], 1e4,dft_ea,temp,nconc)
-
-  #print(np.shape(kmc_data))
-  #kmc_data = kmc_data[:388,:]
-
-  # kmc vs mass action coverage
-  #fig, ax=plt.subplots()
-  #titles = ['Concentration vs Time','Time','Concentration','Reactant','Product','Free Sites']
-  #pl.scatter_plot(kmc_data[:,0],kmc_data[:,1:],titles)
-  #cov_nam = [type_name,'cov',*names,'.png']
-  #cov_namer = '_'.join([str(v) for v in cov_nam])
-  #plt.savefig(cov_namer)
-  #plt.close(fig)
 
   fig, ax = plt.subplots()
 
@@ -160,13 +154,10 @@ def get_turnover_freq(ea_off,y):
   from scipy.signal import savgol_filter
 
   time_max = 2.0*max(y)
-  #time_max = 1.0e13
 
   # get rate constants for turnover frequency 
   const_off = tl.get_rate_const(1.0e13,ea_off,tl.kb_kcal,273.15+50.0)
   const_on = tl.get_rate_const(1.0e13,dft_ea[0],tl.kb_kcal,273.15+50.0)
-
-  print('log off',np.log10(const_off))
 
   nbins = 1000  #1000
   nbins2 = 1000  #500
@@ -176,13 +167,6 @@ def get_turnover_freq(ea_off,y):
   # fit histogram to non-gaussian pdf
   hist = np.histogram(y,bins=nbins2)
   hist_dist = sp.stats.rv_histogram(hist)
-  #laplace_smooth = savgol_filter(hist_dist.pdf(x),31,10)
-  #spl = sp.interpolate.UnivariateSpline(x,laplace_smooth,s=0.)
-  #x = np.linspace(0.0,time_max,nbins*10)
-  #spl3 = sp.interpolate.UnivariateSpline(x,tl.spl2(x,y,spl(x)),s=0.0,k=3)  
-  #spl3_integral = sp.interpolate.UnivariateSpline.integral(spl3,0.0,time_max)
-
-  #x = np.linspace(0.0,time_max,nbins2)
 
   # Log Normal fit
   init = [1.5*sig,np.log(4.4e08)]
@@ -213,45 +197,23 @@ def get_turnover_freq(ea_off,y):
   plt.xlabel('Time (s)')
   plt.title('$f_{cat}(t)$ Log Normal Distribution')
   #plt.legend()
-  #plt.xscale('log')
-  plt.savefig('pdf_check.png')
+  plt.savefig('pdf_check.png') ; plt.close()
   #plt.show()
-  plt.close()
 
   x = np.linspace(0.0,time_max/10,nbins)
   fig, ax = plt.subplots()
   plt.plot(x,laplace_fnc(x),label='Normal')
   plt.plot(x,laplace_fnc_spl(x),label='Spl')
   plt.legend()
-  plt.savefig('transform_check.png')
+  plt.savefig('transform_check.png') ; plt.close()
   #plt.show()
-  plt.close()
 
   toff = 5.0e14  # 2.0e12
-  if ea_off < 36.0:
-    toff = 1.0e13
-  if ea_off < 33.0:
-    toff = 1.0e12  # 1.0e08
-  if ea_off < 32.0:
-    toff = 1.0e11
-  if ea_off < 30.0:
-    toff = 1.0e10
-  if ea_off < 28.0:
-    toff = 1.0e08
-  if ea_off < 25.0:
-    toff = 1.0e05
-  if ea_off < 23.0:
-    toff = 2.0e03
-
-
   if ea_off < 25:
     toff = np.inf
 
-  #laplace_tran, _ =sp.integrate.quad(laplace_fnc,1.0e09,np.inf,epsabs=1e-18,limit=5000) # tin
-  laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,toff,epsabs=1e-18,limit=5000) # tin
+  laplace_tran, _ =sp.integrate.quad(laplace_fnc,0.0,tin,epsabs=1e-18,limit=5000) # tin
   laplace_tran_spl, _ =sp.integrate.quad(laplace_fnc_spl,0.0,tin,limit=500)
-  
-  print('tran',laplace_tran,laplace_tran_spl,'%.4e' % (laplace_tran-laplace_tran_spl) )
 
   turnover_freq = laplace_tran /(1/const_on+1/const_off *(1.0 - laplace_tran))
   turnover_freq_spl = laplace_tran_spl /(1/const_on+1/const_off *(1.0 - laplace_tran_spl))
@@ -267,7 +229,7 @@ def get_turnover_freq(ea_off,y):
 def main():
 
   # Run kMC and mass-action kinetics
-  if type_val[0] == 1:
+  if type_val[0] > 0:
 
     #====================== Introduce correlation into the system ======================#
     for ii in range(0,ncorr):
@@ -278,12 +240,12 @@ def main():
 
       # get distriubtion of energies where the DFT energy is the mean
       for i in range(0,nsim):
-        for j in dist_constants:  # just want to geta distribution of k_cat right now, not correlated
+        for j in dist_constants: 
           if (type_dist == 1): ea[j,i] = np.random.normal(loc=dft_ea[j],scale=sig)    # gaussian distribution
           if (type_dist == 2): ea[j,i] = np.random.laplace(loc=dft_ea[j],scale=sig)   # laplace distribution
           ea_diff[j,i] = ea[j,i] - dft_ea[j]
 
-        for j in non_dist_constants:
+        for j in non_dist_constants:  # these are constant rates
           ea[j,i] = dft_ea[j]
 
       # correlate the energies now based on corr_matrix
@@ -317,61 +279,48 @@ def main():
               plt.savefig('correlation_'+str(i)+'_'+str(j)+'.png')
 
 
-      #for i in range(nrxn):  # fit the turnover data 
-      fig, ax = plt.subplots()
-      y = ea_corr[1,:,ii]
-      plt.hist(y, bins=40, density=True)
-      mu, std = sp.stats.norm.fit(y)
-      x = np.linspace(min(y),max(y),100) 
-      pdf_fitted = sp.stats.norm.pdf(x,mu,std)
-      plt.plot((x),pdf_fitted)
-      plt.savefig('turnover_dist_'+str(int(sig))+'.png')
+      #================================== Run klafter calculation ==================================#
+      if type_val[0] == 2:
 
-      y = (turnover_dist[1,:,ii]) 
+        y = (turnover_dist[1,:,ii]) 
 
-      #ea_un = [40.0,38.0,36.0,34.0,33.0,32.0,31.0,30.0,28.0,26.0,25.0,24.0,23.0,22.0,20.0,18.0,17.0]
-      ea_un = [32.0]
-      turnover_x = np.zeros(np.size(ea_un))
-      turnover_rate = np.zeros((np.size(ea_un),2))
+        #ea_un = [40.0,36.0,32.0,30.0]
+        ea_un = [dft_ea[2]]
+        turnover_x = np.zeros(np.size(ea_un))
+        turnover_rate = np.zeros((np.size(ea_un),2))
 
-      turnover_fil = open('turnover_rate_0'+str(int(10*sig))+'.txt',"w")
-      turnover_fil.close()
-      turnover_fil = open('turnover_rate_0'+str(int(10*sig))+'.txt',"a")
+        turnover_fil = open('turnover_rate_0'+str(int(10*sig))+'.txt',"w") ; turnover_fil.close()
+        turnover_fil = open('turnover_rate_0'+str(int(10*sig))+'.txt',"a")
 
-      for i in range(np.size(ea_un)):
-        turnover_rate[i] = get_turnover_freq(ea_un[i],y)
-        turnover_x[i] = tl.get_rate_const(1.0e13,ea_un[i],tl.kb_kcal,273.15+50.0)
+        for i in range(np.size(ea_un)):
+          turnover_rate[i] = get_turnover_freq(ea_un[i],y)
+          turnover_x[i] = tl.get_rate_const(1.0e13,ea_un[i],tl.kb_kcal,273.15+50.0)
 
-        dat = np.hstack([turnover_x[i],turnover_rate[i,0]])
-        np.savetxt(turnover_fil,dat,newline=" ") ; turnover_fil.write('\n')
+          dat = np.hstack([turnover_x[i],turnover_rate[i,0]])
+          np.savetxt(turnover_fil,dat,newline=" ") ; turnover_fil.write('\n')
 
-      fig, ax = plt.subplots()
-      title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Fit']
-      pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,0]),title)
-      title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Log Normal']
-      #pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,0]),title)
-      #plt.legend()
-      plt.savefig('turnover_0'+str(int(10*sig))+'.png')
-
-
-      # make figure of all the plots 
-      if 1==1:
-        sig_val = ['01','08','010','013','015', '018', '020']
-        turn_rate = []
         fig, ax = plt.subplots()
-        for i in sig_val:
-          fil = open('turnover_rate_'+str(i)+'.txt',"r")
-          dat = np.genfromtxt(fil)
-          plt.plot(np.log10(dat[:,0]),np.log10(dat[:,1]),label=str(int(i)*10/100))
-        plt.legend()
-        plt.title('Turnover Rate  vs Unbinding Rate')
-        plt.xlabel('k$_{off}$ (log10 $s^{-1}$)')
-        plt.ylabel('k$_{turnover}$ (log10 $s^{-1}$)')
-        #plt.savefig('total_rates.png')
-        plt.show()
-      
-      
-      raise SystemExit(0)
+        title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Fit']
+        pl.scatter_plot(np.log10(turnover_x),np.log10(turnover_rate[:,0]),title)
+        title = ['Unbinding Effects','Unbinding Rate (log 10)','Turnover freq (log 10)','Log Normal']
+        plt.savefig('turnover_0'+str(int(10*sig))+'.png')
+
+
+        # make figure of all the plots 
+        if 1==0:
+          sig_val = ['01','08','010','013','015', '018', '020']
+          turn_rate = []
+          fig, ax = plt.subplots()
+          for i in sig_val:
+            fil = open('turnover_rate_'+str(i)+'.txt',"r")
+            dat = np.genfromtxt(fil)
+            plt.plot(np.log10(dat[:,0]),np.log10(dat[:,1]),label=str(int(i)*10/100))
+          plt.legend()
+          plt.title('Turnover Rate  vs Unbinding Rate')
+          plt.xlabel('k$_{off}$ (log10 $s^{-1}$)')
+          plt.ylabel('k$_{turnover}$ (log10 $s^{-1}$)')
+          #plt.savefig('total_rates.png')
+          plt.show()   
     #=======================================================================================#
 
     #================================ Run over temperatures ================================#
@@ -398,7 +347,7 @@ def main():
         nam1 = [type_name, 'kmc', *names,'.txt']
         namer1 = '_'.join([str(v) for v in nam1])
 
-        get_sim_plots(namer1,names,temp_val[iii])
+        get_sim_plots(namer1,namer,names,temp_val[iii])
 
         get_prod_rate(namer1)
 
