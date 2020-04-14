@@ -38,7 +38,7 @@ ncorr = np.size(x1)
 dist_constants = [1]          # which rate constant to create distribution
 non_dist_constants = [0,2]    # rate constants that are not a distribution
 
-dft_ea = [16.0,32.0,32.0]
+dft_ea = [16.0,32.0,30.0]
 nrxn = np.size(dft_ea)
 sizer = 500
 

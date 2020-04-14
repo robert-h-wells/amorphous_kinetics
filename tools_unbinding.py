@@ -345,10 +345,10 @@ def get_pdf(namer,sig):
   popt, pcov = sp.optimize.curve_fit(pl.log_normal,x,hist_dist.pdf(x),p0=init)
   fit_param = popt
 
-  #fig, ax = plt.subplots()
-  #plt.plot(x,pl.log_normal(x,*fit_param))
-  #plt.hist(turn_dat,bins=200,density=True)
-  #plt.show()
+  fig, ax = plt.subplots()
+  plt.plot(x,pl.log_normal(x,*fit_param))
+  plt.hist(turn_dat,bins=200,density=True)
+  plt.show()
 
   moment_fnc = lambda t: t*pl.log_normal(t,*fit_param)
   moment_int, _ =sp.integrate.quad(moment_fnc,0.0,1.0e10,limit=500)
