@@ -192,7 +192,8 @@ class catalyst:
     if self.cov == 0:
       self.rate_avail = 0.0 #self.rate_const[0]  # adsorption reaction (E+S -> ES)
     elif self.cov == 1:
-      self.rate_avail = self.rate_const[1] + self.rate_const[2] # (ES -> E + P or ES -> E + S)
+      self.rate_avail = self.rate_const[1]*self.branch[0,0] + self.rate_const[2]*self.branch[0,1] 
+      # (ES -> E + P or ES -> E + S)
 
   def find_action(self,val,rand_val):
     # atom has been selected to perform action so this chooses which action
@@ -263,6 +264,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       val = 0
       if catalysts[check_val].rate_avail != 0.0: print('gash')
     else:  # another action
+
       i = -1 ; check_rate = ads_rate
       while(rand_val > check_rate):  # find which catalyst is responsible for the action
         i += 1
@@ -278,8 +280,6 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       total_rate -= catalysts[check_val].rate_avail  # remove action being performed from total rate
       val = catalysts[check_val].find_action(check_rate,rand_val) # find which action is occuring
 
-    #print(val,check_val,'%.3e' % tin)
-
     if val == 0:  # reactant adsorbed
       nadsorb += 1
       catalyst_free -= 1
@@ -294,14 +294,12 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       num_product += 1
       conc[0] -= 1
       conc[1] += 1
-      #print(num_product,'%.3e' % tin)
 
-      #if 1 == 1:  # print to file the time of product formation
+      # print to file the time of product formation
       dat = np.hstack([tin])
       np.savetxt(fil[2],dat, newline=" ") ; fil[2].write('\n')
 
     elif val == 2:  # reactant desorbed from catalyst
-      #print('desorb',ndesorb,tin)
       ndesorb += 1
       catalyst_free += 1 
       catalyst_free_list.append(check_val)
