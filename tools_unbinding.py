@@ -170,6 +170,7 @@ class catalyst:
     self.rate_const = np.zeros((nsteps))
     self.cov = 0.
     self.rate_avail = 0.
+    self.rate_avail_scaled = 0.
     self.production = np.zeros((2))
 
   def get_rate_const(self,barrier,A,kb_type,T):
@@ -191,8 +192,10 @@ class catalyst:
     self.cov = species 
     if self.cov == 0:
       self.rate_avail = 0.0 #self.rate_const[0]  # adsorption reaction (E+S -> ES)
+      self.rate_avail_scaled = 0.0
     elif self.cov == 1:
       self.rate_avail = self.rate_const[1]*self.branch[0,0] + self.rate_const[2]*self.branch[0,1] 
+      self.rate_avail_scaled = self.rate_const[1]*self.branch[0,0] + self.rate_const[2]*self.branch[0,1] 
       # (ES -> E + P or ES -> E + S)
 
   def find_action(self,val,rand_val):
@@ -202,11 +205,12 @@ class catalyst:
       self.cov = 1 ; self.species_cov(self.cov)
       return(0)
     elif self.cov == 1:
-      if val + self.rate_const[1] > rand_val:
+      if val + self.rate_const[1]*self.branch[0,0] > rand_val:
         action_choice = 1  # ES -> E + P
         self.cov = 0  ; self.species_cov(self.cov)
         self.production[0] += 1
         return(1)
+      #elif val + self.rate_const[2]*self.branch[0,1] + self.rate_const[1]*self.branch[0,0] > rand_val:
       elif val + self.rate_const[2] + self.rate_const[1] > rand_val:
         action_choice = 2  # ES -> E + S
         self.cov = 0 ; self.species_cov(self.cov)
@@ -226,6 +230,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
   num_species_init = num_species
   conc = [num_species_init,0]
   total_rate = 0.0
+  total_rate_scaled = 0.0
   tin = 0.0
   sizer_check = 0
   num_product = 0. 
@@ -239,6 +244,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
   for i in range(0,ncatalyst):
     catalysts[i].species_cov(0)
     total_rate += catalysts[i].rate_avail
+    total_rate_scaled += catalysts[i].rate_avail_scaled
   
   catalyst_free = ncatalyst
   catalyst_free_list = [i for i in range(ncatalyst)]
@@ -253,7 +259,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
 
     # Choose time at which next action occurs
     randy = np.random.random()
-    delta_t = -1.0/(total_rate+ads_rate)*np.log(randy)
+    delta_t = -1.0/(total_rate_scaled+ads_rate)*np.log(randy)
     tin += delta_t 
     randy2 = np.random.random()
     rand_val = randy2*(total_rate+ads_rate)
@@ -278,6 +284,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       check_val = i
       check_rate -= catalysts[check_val].rate_avail
       total_rate -= catalysts[check_val].rate_avail  # remove action being performed from total rate
+      total_rate_scaled -= catalysts[check_val].rate_avail_scaled
       val = catalysts[check_val].find_action(check_rate,rand_val) # find which action is occuring
 
     if val == 0:  # reactant adsorbed
@@ -307,6 +314,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       num_species += 1
     
     total_rate += catalysts[check_val].rate_avail  # add new action available to total rate
+    total_rate_scaled += catalysts[check_val].rate_avail_scaled
 
     # limit amount of data written to files
     sizer_check += 1

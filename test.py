@@ -9,7 +9,7 @@ from scipy.optimize import curve_fit
 
 prod_time = np.genfromtxt('gauss_prod_time_50_0_0_40_.txt')
 prod_time2 = np.genfromtxt('gauss_prod_time_50_0_0_32_.txt')
-prod_time3 = np.genfromtxt('gauss_prod_time_50_0_0_30_.txt')
+prod_time3 = np.genfromtxt('gauss_prod_time_50_0_0_31_.txt')
 
 nbins = 60
 
@@ -19,6 +19,6 @@ sns.distplot(np.log10(prod_time),hist=False,kde=True,bins=nbins,
 sns.distplot(np.log10(prod_time2),hist=False,kde=True,bins=nbins, 
              kde_kws = {'shade': True, 'linewidth': 3},label='32')
 sns.distplot(np.log10(prod_time3),hist=False,kde=True,bins=nbins, 
-             kde_kws = {'shade': True, 'linewidth': 3},label='32')
+             kde_kws = {'shade': True, 'linewidth': 3},label='31')
 plt.legend()
 plt.show()
