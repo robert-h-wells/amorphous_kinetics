@@ -27,7 +27,7 @@ if type_dist == 2: type_name = 'laplace'
 
 nsim = 10000    # number of catalysts
 nconc = 1.0   # initial reactant concentration relative to catalyst
-sig = 0.10
+sig = 0.01
 
 temp_val = [50.0] 
 tend = [3e09]

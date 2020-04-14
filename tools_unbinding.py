@@ -231,6 +231,8 @@ def kmc_run(catalysts,species_conc,fil,sizer):
 
   # checking desorb process
   ndesorb = 0
+  nadsorb = 0
+  nrxn = 0
 
   # Initialize catalysts and find beginning total rate
   for i in range(0,ncatalyst):
@@ -251,9 +253,9 @@ def kmc_run(catalysts,species_conc,fil,sizer):
     # Choose time at which next action occurs
     randy = np.random.random()
     delta_t = -1.0/(total_rate+ads_rate)*np.log(randy)
-    print(delta_t)
     tin += delta_t 
-    rand_val = randy*(total_rate+ads_rate)
+    randy2 = np.random.random()
+    rand_val = randy2*(total_rate+ads_rate)
     
     # Choose atom to have an action
     if rand_val < ads_rate:  # adsorption
@@ -276,25 +278,30 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       total_rate -= catalysts[check_val].rate_avail  # remove action being performed from total rate
       val = catalysts[check_val].find_action(check_rate,rand_val) # find which action is occuring
 
+    #print(val,check_val,'%.3e' % tin)
+
     if val == 0:  # reactant adsorbed
+      nadsorb += 1
       catalyst_free -= 1
       catalyst_free_list.remove(check_val)  # remove catalyst from free list
       catalysts[check_val].species_cov(1)   # put molecule on chosen catalyst
       num_species -= 1                      # lose a molecule from "gas" phase
-    if val == 1:  # reactant is consumed
+    elif val == 1:  # reactant is consumed
+      nrxn += 1
       catalyst_free += 1 
       catalyst_free_list.append(check_val)
       catalysts[check_val].species_cov(0)
       num_product += 1
       conc[0] -= 1
       conc[1] += 1
+      #print(num_product,'%.3e' % tin)
 
       #if 1 == 1:  # print to file the time of product formation
       dat = np.hstack([tin])
       np.savetxt(fil[2],dat, newline=" ") ; fil[2].write('\n')
 
-    if val == 2:  # reactant desorbed from catalyst
-      #print('desorb',tin)
+    elif val == 2:  # reactant desorbed from catalyst
+      #print('desorb',ndesorb,tin)
       ndesorb += 1
       catalyst_free += 1 
       catalyst_free_list.append(check_val)
@@ -319,7 +326,9 @@ def kmc_run(catalysts,species_conc,fil,sizer):
     dat = np.hstack([i,catalysts[i].ea_corr,catalysts[i].production])
     np.savetxt(fil[1],dat, newline=" ") ; fil[1].write('\n')
 
+  print('nadsorb',nadsorb)
   print('ndesorb',ndesorb)
+  print('nrxn',nrxn)
   print('tin',' %.2E' % Decimal(tin))
   return(tin-delta_t)
 #=============================================================================================================#
@@ -329,7 +338,7 @@ def get_pdf(namer,sig):
   turn_dat = np.genfromtxt(namer, delimiter = '\n')
   time_max = 2.0*max(turn_dat)
 
-  nbins = 1000
+  nbins = 500
   x = np.linspace(0.10,time_max,nbins)
   hist = np.histogram(turn_dat,bins=nbins)
   hist_dist = sp.stats.rv_histogram(hist)
@@ -338,10 +347,10 @@ def get_pdf(namer,sig):
   popt, pcov = sp.optimize.curve_fit(pl.log_normal,x,hist_dist.pdf(x),p0=init)
   fit_param = popt
 
-  fig, ax = plt.subplots()
-  plt.plot(x,pl.log_normal(x,*fit_param))
-  plt.hist(turn_dat,bins=500,density=True)
-  plt.show()
+  #fig, ax = plt.subplots()
+  #plt.plot(x,pl.log_normal(x,*fit_param))
+  #plt.hist(turn_dat,bins=200,density=True)
+  #plt.show()
 
   moment_fnc = lambda t: t*pl.log_normal(t,*fit_param)
   moment_int, _ =sp.integrate.quad(moment_fnc,0.0,1.0e10,limit=500)
