@@ -1,8 +1,21 @@
-names = [str(273),str(1),str(0),str(35)]
+import sys
+import os
+import numpy as np
+import scipy as sp
+import seaborn as sns
+from matplotlib import pyplot as plt
+from decimal import Decimal
+from scipy.optimize import curve_fit
 
+prod_time = np.genfromtxt('gauss_prod_time_50_0_0_40_.txt')
+prod_time2 = np.genfromtxt('gauss_prod_time_50_0_0_32_.txt')
 
-x = ['kmc',*names,'.txt']
-y = print(*x, sep='_')
+nbins = 60
 
-z = '_'.join([str(v) for v in x])
-print(z)
+fig, ax = plt.subplots()
+sns.distplot(np.log10(prod_time),hist=False,kde=True,bins=nbins, 
+             kde_kws = {'shade': True, 'linewidth': 3},label='40')
+sns.distplot(np.log10(prod_time2),hist=False,kde=True,bins=nbins, 
+             kde_kws = {'shade': True, 'linewidth': 3},label='32')
+plt.legend()
+plt.show()
