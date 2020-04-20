@@ -172,6 +172,8 @@ class catalyst:
     self.rate_avail = 0.
     self.rate_avail_scaled = 0.
     self.production = np.zeros((2))
+    self.prod_time = 0.
+    self.bind_time = 0.
 
   def get_rate_const(self,barrier,A,kb_type,T):
     for i in range(0,self.nsteps):
@@ -194,21 +196,23 @@ class catalyst:
       self.rate_avail = 0.0 #self.rate_const[0]  # adsorption reaction (E+S -> ES)
       self.rate_avail_scaled = 0.0
     elif self.cov == 1:
-      self.rate_avail = self.rate_const[1]*self.branch[0,0] + self.rate_const[2]*self.branch[0,1] 
+      self.rate_avail = self.rate_const[1] + self.rate_const[2] 
       self.rate_avail_scaled = self.rate_const[1]*self.branch[0,0] + self.rate_const[2]*self.branch[0,1] 
       # (ES -> E + P or ES -> E + S)
 
-  def find_action(self,val,rand_val):
+  def find_action(self,val,rand_val,time):
     # atom has been selected to perform action so this chooses which action
     if self.cov == 0:
       action_choice = 0     # E+S -> ES
       self.cov = 1 ; self.species_cov(self.cov)
+      self.bind_time = time
       return(0)
     elif self.cov == 1:
       if val + self.rate_const[1]*self.branch[0,0] > rand_val:
         action_choice = 1  # ES -> E + P
         self.cov = 0  ; self.species_cov(self.cov)
         self.production[0] += 1
+        self.prod_time = time - self.bind_time
         return(1)
       #elif val + self.rate_const[2]*self.branch[0,1] + self.rate_const[1]*self.branch[0,0] > rand_val:
       elif val + self.rate_const[2] + self.rate_const[1] > rand_val:
@@ -269,6 +273,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       check_val = random.choice(catalyst_free_list) # randomly select from free catalysts
       val = 0
       if catalysts[check_val].rate_avail != 0.0: print('gash')
+      catalysts[check_val].find_action(total_rate,rand_val,tin)
     else:  # another action
 
       i = -1 ; check_rate = ads_rate
@@ -285,7 +290,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       check_rate -= catalysts[check_val].rate_avail
       total_rate -= catalysts[check_val].rate_avail  # remove action being performed from total rate
       total_rate_scaled -= catalysts[check_val].rate_avail_scaled
-      val = catalysts[check_val].find_action(check_rate,rand_val) # find which action is occuring
+      val = catalysts[check_val].find_action(check_rate,rand_val,tin) # find which action is occuring
 
     if val == 0:  # reactant adsorbed
       nadsorb += 1
@@ -303,7 +308,7 @@ def kmc_run(catalysts,species_conc,fil,sizer):
       conc[1] += 1
 
       # print to file the time of product formation
-      dat = np.hstack([tin])
+      dat = np.hstack([check_val,tin,catalysts[check_val].prod_time])
       np.savetxt(fil[2],dat, newline=" ") ; fil[2].write('\n')
 
     elif val == 2:  # reactant desorbed from catalyst
@@ -338,15 +343,18 @@ def kmc_run(catalysts,species_conc,fil,sizer):
   print('tin',' %.2E' % Decimal(tin))
   return(tin-delta_t)
 #=============================================================================================================#
-def get_pdf(namer,sig):   
+def get_pdf(namer,sig,ea_val):   
   # create probability density function of the turnover times from kmc run
 
   turn_dat = np.genfromtxt(namer, delimiter = '\n')
-  time_max = 2.0*max(turn_dat)
+  time_max = max(turn_dat)
 
-  nbins = 500
-  x = np.linspace(0.10,time_max,nbins)
-  hist = np.histogram(turn_dat,bins=nbins)
+  nbins = 100
+  #log_bins = np.logspace(np.log10(min(turn_dat)),np.log10(time_max),200)
+  log_bins = 200
+
+  x = np.linspace(min(turn_dat),time_max,5*nbins)
+  hist = np.histogram(turn_dat,bins=log_bins)
   hist_dist = sp.stats.rv_histogram(hist)
 
   init = [1.5*sig,np.log(4.4e08)] 
@@ -355,8 +363,21 @@ def get_pdf(namer,sig):
 
   fig, ax = plt.subplots()
   plt.plot(x,pl.log_normal(x,*fit_param))
-  plt.hist(turn_dat,bins=200,density=True)
-  plt.show()
+  plt.hist(turn_dat,bins=log_bins,density=True)
+  plt.ylim(0.0,max(pl.log_normal(x,*fit_param)))
+  plt.savefig('pdf_'+str(int(10*sig))+'_'+str(ea_val)+'.png') ; plt.close()
+  #plt.show()
+
+  time_view_max = 1e09
+  nbins2 = int(nbins*time_view_max/time_max)
+  x2 = np.linspace(0.10,time_view_max,5*nbins)
+  turn_dat_view = turn_dat[turn_dat < time_view_max]
+  fig, ax = plt.subplots()
+  plt.plot(x2,pl.log_normal(x2,*fit_param))
+  plt.hist(turn_dat_view,bins=nbins2,density=True)
+  plt.ylim(0.0,max(pl.log_normal(x2,*fit_param)))
+  plt.savefig('pdf_'+str(int(10*sig))+'_'+str(ea_val)+'_small.png') ; plt.close()
+  #plt.show()
 
   moment_fnc = lambda t: t*pl.log_normal(t,*fit_param)
   moment_int, _ =sp.integrate.quad(moment_fnc,0.0,1.0e10,limit=500)

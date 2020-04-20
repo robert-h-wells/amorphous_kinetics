@@ -18,7 +18,7 @@ num_cores = mp.cpu_count() ; print('num cores',num_cores)
 
 type_run = 1     # 1 for normal, 2 for parallel
 
-type_val = [2,1,0,0,0]  # [0]-run sim, [1]-correlation plots, [2]-determine production rates 
+type_val = [1,1,0,0,0]  # [0]-run sim, [1]-correlation plots, [2]-determine production rates 
                         # [3]-final plots (1 to show, 2 to save), [4]-arrhenius plot 
 
 type_dist = 1    # 1 for gaussian, 2 for laplace
@@ -38,7 +38,7 @@ ncorr = np.size(x1)
 dist_constants = [1]          # which rate constant to create distribution
 non_dist_constants = [0,2]    # rate constants that are not a distribution
 
-dft_ea = [16.0,32.0,30.0]
+dft_ea = [10.0,24.0,30.0]
 nrxn = np.size(dft_ea)
 sizer = 500
 
@@ -57,7 +57,7 @@ def temp_run(temps,tend,iii):
     # correlation step
     for ii in range(0,np.size(x1)):
 
-      names = [str(int(temps)),str(ii),str(int(sig)),str(int(dft_ea[2]))]
+      names = [str(int(temps)),str(ii),str(int(10*sig)),str(int(dft_ea[2]))]
 
       nam1 = [type_name, 'kmc', *names,'.txt']
       nam2 = [type_name, 'catalyst', *names,'.txt']
@@ -82,7 +82,7 @@ def temp_run(temps,tend,iii):
       f.close() ; g.close() ; h.close()
 
       # get pdf of production times
-      tl.get_pdf(namer3,sig)
+      #tl.get_pdf(namer3,sig,names[-1])
 #=======================================================================================#
 
 #=======================================================================================#
@@ -100,7 +100,7 @@ def get_prod_rate(namer1):
   print(rate_determine)
 
   fig, ax = plt.subplots()
-  titles = ['Decay Fits :     k3 = '+str(dft_ea[2])+'   sig = '+str(sig),
+  titles = ['Decay Fits :     k3 = '+str(dft_ea[2])+'   sig = '+str(10*sig),
   'Time','Concentration','Dif EQ']
   pl.scatter_plot((kmc_data[:,0]),(rate_determine),titles)
   #pl.scatter_plot((kmc_data[:,0]),kmc_data[:,1],titles)
@@ -124,7 +124,7 @@ def get_sim_plots(namer1,names,temps):        # makes plots (1 show plots, 2 sav
 
   print('init vals','%.2e' % init_k0, '%.2e' % init_k1, '%.2e' % init_k2)
 
-  titles = ['Decay Fits :     k3 = '+str(dft_ea[2])+'   sig = '+str(sig),
+  titles = ['Decay Fits :     k3 = '+str(dft_ea[2])+'   sig = '+str(10*sig),
   'Time','Concentration','Specific']
 
   init_param = np.array([1.0,init_k1,0.0]) 
@@ -142,7 +142,7 @@ def get_sim_plots(namer1,names,temps):        # makes plots (1 show plots, 2 sav
   pl.scatter_fit_plot(pl.exp_3,kmc_data[:,0],kmc_data[:,1],init_param,titles,2)
 
 
-  titles = ['Decay Fits :     k3 = '+str(dft_ea[2])+'   sig = '+str(sig),
+  titles = ['Decay Fits :     k3 = '+str(dft_ea[2])+'   sig = '+str(10*sig),
   'Time','Concentration','Dif EQ']
   #pl.scatter_plot(ma_x,2.0-ma_y[:,3],titles)
   fit_nam = [type_name,'fit',*names,'.png']
@@ -258,7 +258,7 @@ def main():
 
       # plot distribution of individual rate constants
       if type_val[1] == 1:
-        names = [str(ii),str(int(sig)),str(int(dft_ea[2]))]
+        names = [str(ii),str(int(10*sig)),str(int(dft_ea[2]))]
         pl.distribution_plot(ea_corr)
         dist_nam = [type_name,'dist',*names,'.png']
         dist_namer = '_'.join([str(v) for v in dist_nam])
