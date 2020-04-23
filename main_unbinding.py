@@ -38,7 +38,7 @@ ncorr = np.size(x1)
 dist_constants = [1]          # which rate constant to create distribution
 non_dist_constants = [0,2]    # rate constants that are not a distribution
 
-dft_ea = [10.0,24.0,30.0]
+dft_ea = [10.0,24.0,23.50]
 nrxn = np.size(dft_ea)
 sizer = 500
 
@@ -82,7 +82,7 @@ def temp_run(temps,tend,iii):
       f.close() ; g.close() ; h.close()
 
       # get pdf of production times
-      #tl.get_pdf(namer3,sig,names[-1])
+      tl.get_pdf(namer3,sig,names[-1])
 #=======================================================================================#
 
 #=======================================================================================#

@@ -346,8 +346,13 @@ def kmc_run(catalysts,species_conc,fil,sizer):
 def get_pdf(namer,sig,ea_val):   
   # create probability density function of the turnover times from kmc run
 
-  turn_dat = np.genfromtxt(namer, delimiter = '\n')
-  time_max = max(turn_dat)
+  turn_dat = np.genfromtxt(namer, delimiter = '')
+  print(np.shape(turn_dat))
+
+  turn_dat = turn_dat[:,1]
+  print(np.shape(turn_dat))
+
+  time_max = max(turn_dat) ; print('time max',time_max)
 
   nbins = 100
   #log_bins = np.logspace(np.log10(min(turn_dat)),np.log10(time_max),200)
@@ -357,7 +362,8 @@ def get_pdf(namer,sig,ea_val):
   hist = np.histogram(turn_dat,bins=log_bins)
   hist_dist = sp.stats.rv_histogram(hist)
 
-  init = [1.5*sig,np.log(4.4e08)] 
+  init = [1.5*sig,np.log(4.4e02)] 
+  #init = [0.,0.]
   popt, pcov = sp.optimize.curve_fit(pl.log_normal,x,hist_dist.pdf(x),p0=init)
   fit_param = popt
 
@@ -368,7 +374,7 @@ def get_pdf(namer,sig,ea_val):
   plt.savefig('pdf_'+str(int(10*sig))+'_'+str(ea_val)+'.png') ; plt.close()
   #plt.show()
 
-  time_view_max = 1e09
+  time_view_max = 1e05
   nbins2 = int(nbins*time_view_max/time_max)
   x2 = np.linspace(0.10,time_view_max,5*nbins)
   turn_dat_view = turn_dat[turn_dat < time_view_max]
